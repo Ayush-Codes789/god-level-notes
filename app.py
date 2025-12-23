@@ -1,22 +1,27 @@
 import streamlit as st
 import google.generativeai as genai
+import re  # Standard regex library
+from datetime import datetime
 
 # Page configuration
 st.set_page_config(page_title="God Level Notes", page_icon="⚡", layout="wide")
 
 # App Header
 st.title("⚡ God Level Note Generator")
-st.subheader("Powered by Gemini 1.5 Flash")
+st.subheader("Powered by Gemini 2.5 Flash")
 
 # Sidebar for API Configuration
 with st.sidebar:
     st.header("Settings")
     api_key = st.text_input("Enter Gemini API Key", type="password")
-    model_name = st.selectbox("Choose Model", ["gemini-2.5-flash", "gemini-2.5-pro"])
+    # Fixed model names to current available versions
+    model_choice = st.selectbox("Choose Model", ["gemini-2.5-flash", "gemini-2.5-pro"])
     st.info("Get your key at [Google AI Studio](https://aistudio.google.com/)")
 
 # The Prompt Template
 SYSTEM_PROMPT = """
+Follow your blueprint to create 'God Level Notes' from the transcript provided. 
+Ensure the first line is a clear H1 header (e.g., # God Level Notes: Topic Name).
 Of course. Creating "God Level Notes" is a systematic process I follow to transform raw information, like a lecture transcript, into structured, actionable, and easy-to-review knowledge. It's built on a foundation of understanding, structuring, and summarizing.
 Here is the exact manner and blueprint I follow:
 💡 Step 1: Identify the Core Concept (The "Why")
@@ -50,11 +55,23 @@ This becomes the 🧠 Theory & Key Concepts Explained section. It adds the cruci
 Finally, I review the entire set of notes and distill the most critical, must-remember lessons into a concise summary. This section is designed for quick future review and to reinforce the main points of the lecture. I identify the 3-5 most important concepts, principles, or warnings from the material.
 This becomes the 📌 Key Takeaways section at the end of the notes.
 This structured approach ensures that the final notes are not just a passive transcript, but a refined and valuable learning asset designed for both immediate understanding and long-term retention.
-I'm ready for the next lecture whenever you are.
+---
 """
 
+# Helper function to extract a clean filename from the response
+def get_filename(text):
+    # Look for the first line starting with # (Markdown header)
+    match = re.search(r'#\s*(.*)', text)
+    if match:
+        # Clean the title: remove special characters and replace spaces with underscores
+        title = match.group(1).strip()
+        # Keep only alphanumeric, spaces, and hyphens, then replace spaces with underscores
+        clean_title = re.sub(r'[^\w\s-]', '', title).replace(' ', '_')
+        return f"{clean_title}.md"
+    return "God_Level_Notes.md"
+
 # UI Layout
-transcript = st.text_area("Paste the Video Transcript here:", height=300, placeholder="Wait... then he says 'npm install'...")
+transcript = st.text_area("Paste the Video Transcript here:", height=300, placeholder="Paste transcript here...")
 
 if st.button("Generate God Level Notes"):
     if not api_key:
@@ -63,25 +80,32 @@ if st.button("Generate God Level Notes"):
         st.warning("Please paste a transcript first.")
     else:
         try:
-            # Configure Gemini
+            # 1. Configure Gemini
             genai.configure(api_key=api_key)
-            model = genai.GenerativeModel(model_name)
+            
+            # 2. INITIALIZE THE MODEL OBJECT (This fixes your error)
+            model = genai.GenerativeModel(model_choice)
             
             with st.spinner("Processing transcript into God Level Notes..."):
-                # Combining prompt with user input
+                # 3. Combining prompt with user input
                 full_prompt = f"{SYSTEM_PROMPT}\n\nTRANSCRIPT:\n{transcript}"
                 
+                # 4. Call generate_content on the MODEL object, not the string
                 response = model.generate_content(full_prompt)
+                generated_text = response.text
                 
                 # Display Results
                 st.markdown("---")
-                st.markdown(response.text)
+                st.markdown(generated_text)
                 
-                # Add a download button for the generated markdown
+                # 5. Extract Dynamic Filename
+                final_filename = get_filename(generated_text)
+                
+                # Add a download button
                 st.download_button(
                     label="Download as Markdown",
-                    data=response.text,
-                    file_name="god_level_notes.md",
+                    data=generated_text,
+                    file_name=final_filename,
                     mime="text/markdown"
                 )
                 
